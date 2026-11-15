@@ -1,0 +1,8 @@
+{
+  "name": "Remix Remix Terra Analogue",
+  "description": "An interactive 3D web portal featuring scientific planetary data, research literature, and immersive orbital exploration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
