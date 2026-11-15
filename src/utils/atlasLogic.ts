@@ -284,5 +284,59 @@ export function getDualPageDataset(mode: 'earth-mars' | 'earth-moon'): DualPageD
   };
 }
 
+const CUSTOM_PLACE_SLUGS: Record<string, string> = {
+  'mars-place-olympus': 'olympus-mons',
+  'mars-place-valles': 'valles-marineris',
+  'mars-place-gale': 'gale-crater',
+  'mars-place-jezero': 'jezero-crater',
+  'mars-place-polar': 'polar-ice-caps',
+  'mars-place-eberswalde': 'eberswalde-crater',
+  'moon-place-imbrium': 'mare-imbrium',
+  'moon-place-tycho': 'tycho-crater',
+  'moon-place-copernicus': 'copernicus-crater',
+  'moon-place-tranquility': 'sea-of-tranquility',
+  'moon-place-southpole': 'lunar-south-pole',
+  'moon-place-aitken': 'south-pole-aitken-basin',
+};
+
+export function placeToSlug(place: PlanetPlace): string {
+  if (CUSTOM_PLACE_SLUGS[place.id]) {
+    return CUSTOM_PLACE_SLUGS[place.id];
+  }
+  return place.name
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, '')
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+export function placeToDetailPath(place: PlanetPlace): string {
+  const base = place.planet === 'moon' ? '/moon-analogues' : '/mars-analogues';
+  return `${base}/${placeToSlug(place)}`;
+}
+
+export function findPlaceByDetailPath(
+  pathname: string,
+  places: PlanetPlace[] = [...MARS_PLACES, ...MOON_PLACES]
+): PlanetPlace | null {
+  const parts = pathname.replace(/\/+$/, '').split('/').filter(Boolean);
+  if (parts.length < 2) return null;
+  const prefix = parts[0];
+  if (prefix !== 'mars-analogues' && prefix !== 'moon-analogues') return null;
+  const slug = parts[1].toLowerCase();
+  const expectedPlanet: PlanetId = prefix === 'moon-analogues' ? 'moon' : 'mars';
+
+  return (
+    places.find((p) => {
+      if (p.planet !== expectedPlanet) return false;
+      const canonical = placeToSlug(p);
+      const shortId = p.id.replace(/^(mars|moon)-place-/, '');
+      return canonical === slug || shortId === slug || p.id.toLowerCase() === slug;
+    }) ?? null
+  );
+}
+
+
 
 

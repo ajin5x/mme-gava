@@ -8,8 +8,8 @@ export interface DeepSpaceEnvironment {
 
 export const WHITE_GOLD_STAR_HEX = {
   white: 0xffffff,
-  warmGold: 0xffd700,
-  champagneGold: 0xf5d77a,
+  silver: 0xd8e2ec,
+  starlight: 0xf0f4f8,
 } as const;
 
 /**
@@ -226,8 +226,8 @@ function buildStarPoints(
   const halos = new Float32Array(count);
 
   const pureWhite = new THREE.Color(WHITE_GOLD_STAR_HEX.white);
-  const warmGold = new THREE.Color(WHITE_GOLD_STAR_HEX.warmGold);
-  const champagneGold = new THREE.Color(WHITE_GOLD_STAR_HEX.champagneGold);
+  const silverCol = new THREE.Color(WHITE_GOLD_STAR_HEX.silver);
+  const starlightCol = new THREE.Color(WHITE_GOLD_STAR_HEX.starlight);
 
   for (let i = 0; i < count; i++) {
     const r = minRadius + Math.random() * (maxRadius - minRadius);
@@ -237,13 +237,9 @@ function buildStarPoints(
     positions[i * 3 + 1] = r * Math.cos(phi);
     positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
 
-    // 90% white stars (#FFFFFF), 10% golden stars (#FFD700)
     const roll = Math.random();
-    const isGold = roll >= 0.90;
-    const baseCol =
-      roll < 0.90 ? pureWhite : (Math.random() < 0.5 ? warmGold : champagneGold);
+    const baseCol = roll < 0.65 ? pureWhite : roll < 0.88 ? silverCol : starlightCol;
 
-    // Natural stellar magnitude spread so stars are NOT equally bright
     const mag = 0.24 + Math.pow(Math.random(), 2.3) * 0.76;
     colors[i * 3] = baseCol.r * mag;
     colors[i * 3 + 1] = baseCol.g * mag;
@@ -252,10 +248,7 @@ function buildStarPoints(
     scales[i] = 0.55 + Math.pow(Math.random(), 2.6) * 1.65;
     phases[i] = Math.random() * Math.PI * 2;
     twinkleAmps[i] = Math.random() < 0.45 ? 0.45 + Math.random() * 0.55 : 0.0;
-
-    // Subtle golden halo reserved for selected brighter white/gold stars
-    const isBrightCandidate = mag > 0.58 && (isGold || Math.random() < 0.35);
-    halos[i] = isBrightCandidate && Math.random() < haloFraction * 2.2 ? 0.55 + Math.random() * 0.45 : 0.0;
+    halos[i] = 0.0;
   }
 
   const geo = new THREE.BufferGeometry();
@@ -294,8 +287,8 @@ export function createInstancedStarfield(count = 4000): {
   const positions = new Float32Array(count * 3);
 
   const pureWhite = new THREE.Color(WHITE_GOLD_STAR_HEX.white);
-  const silverCol = new THREE.Color(0xd8e2ec);
-  const goldCol = new THREE.Color(WHITE_GOLD_STAR_HEX.warmGold);
+  const silverCol = new THREE.Color(WHITE_GOLD_STAR_HEX.silver);
+  const starlightCol = new THREE.Color(WHITE_GOLD_STAR_HEX.starlight);
 
   for (let i = 0; i < count; i++) {
     const r = 40 + Math.random() * 95;
@@ -320,7 +313,7 @@ export function createInstancedStarfield(count = 4000): {
     mesh.setMatrixAt(i, dummy.matrix);
 
     const roll = Math.random();
-    const c = roll < 0.88 ? pureWhite : roll < 0.96 ? silverCol : goldCol;
+    const c = roll < 0.65 ? pureWhite : roll < 0.88 ? silverCol : starlightCol;
     mesh.setColorAt(i, c);
   }
 
@@ -452,8 +445,8 @@ export function createDeepSpaceEnvironment(
   // 4. Occasional Pure White & Golden Shooting Stars
   const shootingColors = [
     WHITE_GOLD_STAR_HEX.white,
-    WHITE_GOLD_STAR_HEX.warmGold,
-    WHITE_GOLD_STAR_HEX.champagneGold,
+    WHITE_GOLD_STAR_HEX.silver,
+    WHITE_GOLD_STAR_HEX.starlight,
   ];
   const shootingStars: ShootingStar[] = Array.from({ length: 3 }, (_, idx) => {
     const posArr = new Float32Array(6);

@@ -5,8 +5,12 @@ import { ComparisonModal } from './components/ComparisonModal';
 import { DualComparisonPanel } from './components/DualComparisonPanel';
 import { PlanetExplorationModal } from './components/PlanetExplorationModal';
 import { PlanetAnalogueDiscoveryPage } from './components/PlanetAnalogueDiscoveryPage';
+import { PlanetPlaceDetailPage } from './components/PlanetPlaceDetailPage';
+import { GlowingLineTransitionOverlay } from './components/GlowingLineTransitionOverlay';
 import { SearchFilterBar } from './components/SearchFilterBar';
 import {
+  MARS_PLACES,
+  MOON_PLACES,
   PAGE_ROUTES,
   PLANET_DATASETS,
   PLANET_PLACES_BY_ID,
@@ -19,11 +23,13 @@ import { PlanetaryViewport } from './three/PlanetaryViewport';
 import {
   computeLivePlanetTelemetry,
   DEFAULT_ROTATION_SPEED,
+  findPlaceByDetailPath,
   getDualPageDataset,
   isDualComparisonMode,
   pageModeToPath,
   pageModeToPlanet,
   pathToPageMode,
+  placeToDetailPath,
   planetToPageMode,
   type EarthPinScope,
 } from './utils/atlasLogic';
@@ -35,6 +41,8 @@ const SPEED_OPTIONS: ReadonlyArray<{ id: RotationSpeedPreset; label: string }> =
   { id: 'cinematic', label: 'Cinematic' },
 ];
 
+const ALL_DETAIL_PLACES = [...MARS_PLACES, ...MOON_PLACES];
+
 function pushRoutePath(mode: PageMode) {
   if (typeof window === 'undefined') return;
   const targetPath = pageModeToPath(mode);
@@ -44,6 +52,11 @@ function pushRoutePath(mode: PageMode) {
 }
 
 export default function App() {
+  const [activeDetailPlace, setActiveDetailPlace] = useState<PlanetPlace | null>(() =>
+    typeof window !== 'undefined'
+      ? findPlaceByDetailPath(window.location.pathname, ALL_DETAIL_PLACES)
+      : null
+  );
   const [pageMode, setPageMode] = useState<PageMode>(() =>
     typeof window !== 'undefined' ? pathToPageMode(window.location.pathname) : 'earth-mars'
   );
@@ -68,6 +81,7 @@ export default function App() {
   const [citationFilter, setCitationFilter] = useState<string | null>(null);
   const [isCompareOpen, setIsCompareOpen] = useState<boolean>(false);
   const [explorationPlace, setExplorationPlace] = useState<PlanetPlace | null>(null);
+  const [selectedTransitionPlace, setSelectedTransitionPlace] = useState<PlanetPlace | null>(null);
   const [webglError, setWebglError] = useState<string | null>(null);
   const [liveTimestamp, setLiveTimestamp] = useState<number>(() => Date.now());
 
@@ -82,6 +96,11 @@ export default function App() {
   // Keep state synchronized with browser Back / Forward navigation
   useEffect(() => {
     const handlePopState = () => {
+      const place = findPlaceByDetailPath(window.location.pathname, ALL_DETAIL_PLACES);
+      setActiveDetailPlace(place);
+      setSelectedTransitionPlace(null);
+      if (place) return;
+
       const nextMode = pathToPageMode(window.location.pathname);
       const nextPlanet = pageModeToPlanet(nextMode);
       setPageMode(nextMode);
@@ -100,6 +119,8 @@ export default function App() {
   }, []);
 
   const navigateToEarthMars = useCallback(() => {
+    setSelectedTransitionPlace(null);
+    setActiveDetailPlace(null);
     setPageMode('earth-mars');
     setSelectedPlanet(null);
     setSelectedPlaceId(null);
@@ -108,7 +129,18 @@ export default function App() {
     pushRoutePath('earth-mars');
   }, []);
 
+  const handleNavigateDetail = useCallback((place: PlanetPlace) => {
+    const targetPath = placeToDetailPath(place);
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({ placeId: place.id }, '', targetPath);
+    }
+    setSelectedTransitionPlace(null);
+    setActiveDetailPlace(place);
+  }, []);
+
   const navigateToDualComparison = useCallback((mode: 'earth-mars' | 'earth-moon') => {
+    setSelectedTransitionPlace(null);
+    setActiveDetailPlace(null);
     setPageMode(mode);
     setSelectedPlanet(null);
     setSelectedPlaceId(null);
@@ -120,6 +152,8 @@ export default function App() {
   const navigateToPlanetDestination = useCallback(
     (planet: PlanetId, placeId?: string, cardId?: string) => {
       const nextMode = planetToPageMode(planet);
+      setSelectedTransitionPlace(null);
+      setActiveDetailPlace(null);
       setIsRotating(false);
       setPageMode(nextMode);
       setSelectedPlanet(planet);
@@ -174,11 +208,15 @@ export default function App() {
 
   const handleSelectPlace = useCallback(
     (place: PlanetPlace) => {
+      if (selectedTransitionPlace) return;
       if (isDualComparisonMode(pageMode)) {
         setIsRotating(false);
         setSelectedPlanet(place.planet);
         setSelectedPlaceId(place.id);
         setHighlightedCardId(place.linkedCardId ?? null);
+        if (place.planet === 'mars' || place.planet === 'moon') {
+          setSelectedTransitionPlace(place);
+        }
         return;
       }
       const nextMode = planetToPageMode(place.planet);
@@ -189,7 +227,7 @@ export default function App() {
       setHighlightedCardId(place.linkedCardId ?? null);
       pushRoutePath(nextMode);
     },
-    [pageMode]
+    [pageMode, selectedTransitionPlace]
   );
 
   const handleSelectCitation = useCallback((citation: string) => {
@@ -220,7 +258,13 @@ export default function App() {
       data-selected-planet={selectedPlanet ?? 'none'}
       className="relative w-screen h-screen overflow-hidden bg-[#06080E] text-slate-100"
     >
-      {pageMode === 'mars-analogues' ? (
+      {activeDetailPlace ? (
+        <PlanetPlaceDetailPage
+          place={activeDetailPlace}
+          onBack={navigateToEarthMars}
+          onSelectCitation={handleSelectCitation}
+        />
+      ) : pageMode === 'mars-analogues' ? (
         <PlanetAnalogueDiscoveryPage
           planet="mars"
           onBack={navigateToEarthMars}
@@ -424,6 +468,14 @@ export default function App() {
         onClose={() => setExplorationPlace(null)}
         onSelectCitation={handleSelectCitation}
       />
+      {selectedTransitionPlace && (
+        <GlowingLineTransitionOverlay
+          place={selectedTransitionPlace}
+          onReset={() => setSelectedTransitionPlace(null)}
+          onNavigateDetail={handleNavigateDetail}
+          onSelectCitation={handleSelectCitation}
+        />
+      )}
     </div>
   );
 }

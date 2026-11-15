@@ -15,6 +15,7 @@ import {
   DEFAULT_ROTATION_SPEED,
   filterEarthBenchmarkPins,
   filterLiteratureCards,
+  findPlaceByDetailPath,
   getDualPageDataset,
   getRotationRates,
   getUniqueCitations,
@@ -23,14 +24,15 @@ import {
   pageModeToPath,
   pageModeToPlanet,
   pathToPageMode,
+  placeToDetailPath,
   planetToPageMode,
 } from './atlasLogic';
 
 test('all 17 curated scientific literature cards, planet places, and destination Earth sites are present', () => {
   assert.equal(LITERATURE_CARDS.length, 17);
   assert.equal(EARTH_ANALOGUE_PINS.length, 8);
-  assert.equal(MARS_PLACES.length, 4);
-  assert.equal(MOON_PLACES.length, 4);
+  assert.equal(MARS_PLACES.length, 6);
+  assert.equal(MOON_PLACES.length, 6);
   assert.equal(MOON_EARTH_ANALOGUE_SITES.length, 5);
   assert.equal(MARS_EARTH_ANALOGUE_SITES.length, 4);
   assert.equal(Object.keys(PLANET_DATASETS).length, 3);
@@ -67,16 +69,16 @@ test('filterLiteratureCards filters by keyword across Mars, Moon, and Earth', ()
   assert.equal(lavaTubeMatches[0].id, 'moon-lava-tubes');
 });
 
-test('computeLivePlanetTelemetry keeps temperatures within planet/place bounds and handles lava tubes', () => {
+test('computeLivePlanetTelemetry keeps temperatures within planet/place bounds and handles constant thermal zones', () => {
   const marsPlace = MARS_PLACES[0];
   const marsTelemetry = computeLivePlanetTelemetry('mars', marsPlace, 1_700_000_000_000);
   assert.ok(marsTelemetry.temperatureC >= marsPlace.tempMinC);
   assert.ok(marsTelemetry.temperatureC <= marsPlace.tempMaxC);
   assert.equal(marsTelemetry.gravityDisplay, '3.72 m/s² (0.38 g)');
 
-  const lunarLavaTube = MOON_PLACES.find((p) => p.id === 'moon-place-lavatubes')!;
-  const tubeTelemetryA = computeLivePlanetTelemetry('moon', lunarLavaTube, 1000);
-  const tubeTelemetryB = computeLivePlanetTelemetry('moon', lunarLavaTube, 30_000);
+  const constantThermalZone = { ...MOON_PLACES[0], constantTempC: -20 };
+  const tubeTelemetryA = computeLivePlanetTelemetry('moon', constantThermalZone, 1000);
+  const tubeTelemetryB = computeLivePlanetTelemetry('moon', constantThermalZone, 30_000);
   assert.equal(tubeTelemetryA.temperatureC, -20);
   assert.equal(tubeTelemetryB.temperatureC, -20);
   assert.equal(tubeTelemetryA.diurnalPhaseLabel, 'Subsurface Constant Thermal Zone');
@@ -91,7 +93,7 @@ test('latLonToSpherePosition places points accurately on sphere radius', () => {
   }
 });
 
-test('route helpers map seamlessly across Dual Comparisons, and Planet Analogue routes', () => {
+test('route helpers map seamlessly across Dual Comparisons, Planet Analogue routes, and Place Detail routes', () => {
   assert.equal(pathToPageMode('/'), 'earth-mars');
   assert.equal(pathToPageMode('/earth-mars'), 'earth-mars');
   assert.equal(pathToPageMode('/earth-moon'), 'earth-moon');
@@ -113,6 +115,19 @@ test('route helpers map seamlessly across Dual Comparisons, and Planet Analogue 
   assert.equal(planetToPageMode('moon'), 'moon-analogues');
   assert.equal(planetToPageMode('mars'), 'mars-analogues');
   assert.equal(planetToPageMode('earth'), 'earth-benchmark');
+
+  const olympus = MARS_PLACES.find((p) => p.id === 'mars-place-olympus')!;
+  assert.equal(placeToDetailPath(olympus), '/mars-analogues/olympus-mons');
+  assert.equal(findPlaceByDetailPath('/mars-analogues/olympus-mons')?.id, 'mars-place-olympus');
+  assert.equal(findPlaceByDetailPath('/mars-analogues/valles-marineris')?.id, 'mars-place-valles');
+  assert.equal(findPlaceByDetailPath('/mars-analogues/jezero-crater')?.id, 'mars-place-jezero');
+  assert.equal(findPlaceByDetailPath('/mars-analogues/gale-crater')?.id, 'mars-place-gale');
+  assert.equal(findPlaceByDetailPath('/mars-analogues/eberswalde-crater')?.id, 'mars-place-eberswalde');
+
+  assert.equal(findPlaceByDetailPath('/moon-analogues/mare-imbrium')?.id, 'moon-place-imbrium');
+  assert.equal(findPlaceByDetailPath('/moon-analogues/tycho-crater')?.id, 'moon-place-tycho');
+  assert.equal(findPlaceByDetailPath('/moon-analogues/copernicus-crater')?.id, 'moon-place-copernicus');
+  assert.equal(findPlaceByDetailPath('/moon-analogues/lunar-south-pole')?.id, 'moon-place-southpole');
 });
 
 test('filterEarthBenchmarkPins separates shared Moon+Mars training sites from Mars-only sites', () => {
@@ -147,14 +162,14 @@ test('getDualPageDataset pairs Earth benchmark sites with Mars or Moon places on
   assert.equal(earthMars.spec.leftPlanet, 'mars');
   assert.equal(earthMars.spec.rightPlanet, 'earth');
   assert.equal(earthMars.earthPlaces.length, 8);
-  assert.equal(earthMars.rightPlaces.length, 4);
+  assert.equal(earthMars.rightPlaces.length, 6);
   assert.equal(earthMars.analogueSites.length, 4);
 
   const earthMoon = getDualPageDataset('earth-moon');
   assert.equal(earthMoon.spec.leftPlanet, 'moon');
   assert.equal(earthMoon.spec.rightPlanet, 'earth');
   assert.equal(earthMoon.earthPlaces.length, 4);
-  assert.equal(earthMoon.rightPlaces.length, 4);
+  assert.equal(earthMoon.rightPlaces.length, 6);
   assert.equal(earthMoon.analogueSites.length, 5);
 });
 

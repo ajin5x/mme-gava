@@ -44,6 +44,7 @@ interface PlanetaryViewportProps {
   earthPinScope?: EarthPinScope;
   onSelectPlanet: (planet: PlanetId) => void;
   onSelectPlace: (place: PlanetPlace) => void;
+  onHoverMarsPlace?: (place: PlanetPlace | null) => void;
   onWebglError?: (message: string) => void;
 }
 
@@ -52,6 +53,7 @@ interface PinEntry {
   group: THREE.Group;
   beaconMat: THREE.MeshStandardMaterial;
   ringMat: THREE.MeshBasicMaterial;
+  baseColor: THREE.Color;
 }
 
 // Identical sphere size for Earth, Mars & The Moon across the entire atlas (enlarged for majestic scale)
@@ -77,7 +79,8 @@ function buildPlacePins(
   stemGeo: THREE.BufferGeometry,
   headGeo: THREE.BufferGeometry,
   haloGeo: THREE.BufferGeometry,
-  disposableMaterials: THREE.Material[]
+  disposableMaterials: THREE.Material[],
+  disposableGeometries: THREE.BufferGeometry[]
 ): { container: THREE.Group; entries: PinEntry[] } {
   const container = new THREE.Group();
   const entries: PinEntry[] = places.map((place, index) => {
@@ -132,11 +135,27 @@ function buildPlacePins(
     surfaceRing.userData.placeId = place.id;
     surfaceRing.userData.planetId = place.planet;
 
+    // Invisible larger hit area cylinder for responsive clicking
+    const hitGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.42, 12);
+    const hitMat = new THREE.MeshBasicMaterial({ visible: false, transparent: true, opacity: 0 });
+    const hitMesh = new THREE.Mesh(hitGeo, hitMat);
+    hitMesh.position.y = 0.12;
+    hitMesh.userData.placeId = place.id;
+    hitMesh.userData.planetId = place.planet;
+    disposableGeometries.push(hitGeo);
+    disposableMaterials.push(hitMat);
+
     disposableMaterials.push(stemMat, beaconMat, ringMat);
-    pGroup.add(stem, beacon, surfaceRing);
+    pGroup.add(stem, beacon, surfaceRing, hitMesh);
     container.add(pGroup);
 
-    return { place, group: pGroup, beaconMat, ringMat };
+    return {
+      place,
+      group: pGroup,
+      beaconMat,
+      ringMat,
+      baseColor: new THREE.Color(colorHex),
+    };
   });
 
   return { container, entries };
@@ -165,8 +184,8 @@ function createBackgroundStarfield(
   const goldenHalos = new Float32Array(count);
 
   const pureWhite = new THREE.Color(WHITE_GOLD_STAR_HEX.white);
-  const warmGold = new THREE.Color(WHITE_GOLD_STAR_HEX.warmGold);
-  const champagneGold = new THREE.Color(WHITE_GOLD_STAR_HEX.champagneGold);
+  const silverCol = new THREE.Color(WHITE_GOLD_STAR_HEX.silver);
+  const starlightCol = new THREE.Color(WHITE_GOLD_STAR_HEX.starlight);
 
   const farCutoff = Math.floor(count * 0.56);
   const midCutoff = Math.floor(count * 0.88);
@@ -205,13 +224,8 @@ function createBackgroundStarfield(
     positions[i * 3 + 1] = r * Math.cos(phi);
     positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
 
-    // 90% white stars (#FFFFFF), 10% golden stars (#FFD700)
     const paletteRoll = Math.random();
-    const isGold = paletteRoll >= 0.90;
-    const baseCol =
-      paletteRoll < 0.90
-        ? pureWhite
-        : (Math.random() < 0.5 ? warmGold : champagneGold);
+    const baseCol = paletteRoll < 0.65 ? pureWhite : paletteRoll < 0.88 ? silverCol : starlightCol;
 
     const magnitude = 0.24 + Math.pow(Math.random(), 2.3) * 0.76;
     colors[i * 3] = baseCol.r * magnitude;
@@ -221,12 +235,7 @@ function createBackgroundStarfield(
     sizes[i] = 0.55 + Math.pow(Math.random(), 2.5) * 1.65;
     phases[i] = Math.random() * Math.PI * 2;
     twinkles[i] = Math.random() < 0.45 ? 0.42 + Math.random() * 0.53 : 0.0;
-
-    // Soft glowing halos selectively on bright golden stars
-    goldenHalos[i] =
-      isGold && magnitude > 0.42 && Math.random() < 0.55
-        ? 0.55 + Math.random() * 0.45
-        : 0.0;
+    goldenHalos[i] = 0.0;
   }
 
   const geo = new THREE.BufferGeometry();
@@ -355,6 +364,7 @@ export function PlanetaryViewport({
   earthPinScope = 'all',
   onSelectPlanet,
   onSelectPlace,
+  onHoverMarsPlace,
   onWebglError,
 }: PlanetaryViewportProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -365,8 +375,10 @@ export function PlanetaryViewport({
   const rotationSpeedRef = useRef<RotationSpeedPreset>(rotationSpeed);
   const selectedPlaceIdRef = useRef<string | null>(selectedPlaceId);
   const earthPinScopeRef = useRef<EarthPinScope>(earthPinScope);
+  const hoveredPinIdRef = useRef<string | null>(null);
   const onSelectPlanetRef = useRef(onSelectPlanet);
   const onSelectPlaceRef = useRef(onSelectPlace);
+  const onHoverMarsPlaceRef = useRef(onHoverMarsPlace);
   const onWebglErrorRef = useRef(onWebglError);
 
   const cameraTransitionActiveRef = useRef<boolean>(true);
@@ -394,8 +406,9 @@ export function PlanetaryViewport({
   useEffect(() => {
     onSelectPlanetRef.current = onSelectPlanet;
     onSelectPlaceRef.current = onSelectPlace;
+    onHoverMarsPlaceRef.current = onHoverMarsPlace;
     onWebglErrorRef.current = onWebglError;
-  }, [onSelectPlanet, onSelectPlace, onWebglError]);
+  }, [onSelectPlanet, onSelectPlace, onHoverMarsPlace, onWebglError]);
 
   useEffect(() => {
     const container = mountRef.current;
@@ -649,7 +662,8 @@ export function PlanetaryViewport({
       pinStemGeo,
       pinHeadGeo,
       pinHaloGeo,
-      disposableMaterials
+      disposableMaterials,
+      disposableGeometries
     );
     earthSpinGroup.add(earthPins.container);
 
@@ -729,7 +743,8 @@ export function PlanetaryViewport({
       pinStemGeo,
       pinHeadGeo,
       pinHaloGeo,
-      disposableMaterials
+      disposableMaterials,
+      disposableGeometries
     );
     marsSpinGroup.add(marsPins.container);
 
@@ -809,7 +824,8 @@ export function PlanetaryViewport({
       pinStemGeo,
       pinHeadGeo,
       pinHaloGeo,
-      disposableMaterials
+      disposableMaterials,
+      disposableGeometries
     );
     moonSpinGroup.add(moonPins.container);
 
@@ -878,14 +894,10 @@ export function PlanetaryViewport({
       renderer.compile(scene, camera);
     }
 
-    // Raycasting setup
+    // Raycasting setup - strictly restricted to highlighted geographical pins per prompt instruction
     const raycaster = new THREE.Raycaster();
     const pointerNdc = new THREE.Vector2();
     const raycastTargets: THREE.Object3D[] = [
-      earthMesh,
-      earthClouds,
-      marsMesh,
-      moonMesh,
       ...allPinEntries.flatMap((entry) => entry.group.children),
     ];
 
@@ -923,31 +935,21 @@ export function PlanetaryViewport({
 
       const hit = hits[0].object;
       const placeId = hit.userData.placeId as string | undefined;
-      const planetId = hit.userData.planetId as PlanetId | undefined;
 
       if (placeId) {
         const matched = allPlaces.find((p) => p.id === placeId);
         if (matched) {
           isRotatingRef.current = false;
           onSelectPlaceRef.current(matched);
-          return;
         }
       }
-
-      if (planetId) {
-        isRotatingRef.current = false;
-        onSelectPlanetRef.current(planetId);
-      }
     };
-
-    let hoveredPlanet: PlanetId | null = null;
-    container.dataset.hoveredPlanet = 'none';
 
     let lastHoverCheck = 0;
     const handlePointerMove = (e: PointerEvent) => {
       updateNdc(e.clientX, e.clientY);
       const now = performance.now();
-      if (now - lastHoverCheck < 40) return;
+      if (now - lastHoverCheck < 16) return;
       lastHoverCheck = now;
 
       raycaster.setFromCamera(pointerNdc, camera);
@@ -955,20 +957,26 @@ export function PlanetaryViewport({
         .intersectObjects(raycastTargets, false)
         .filter((h) => isObjectVisibleInHierarchy(h.object));
 
-      const nextHovered =
-        hits.length > 0 ? ((hits[0].object.userData.planetId as PlanetId | undefined) ?? null) : null;
-      if (nextHovered !== hoveredPlanet) {
-        hoveredPlanet = nextHovered;
-        container.dataset.hoveredPlanet = nextHovered ?? 'none';
+      const firstPinHit = hits.find((h) => Boolean(h.object.userData.placeId));
+      const hitPlaceId = (firstPinHit?.object.userData.placeId as string | undefined) ?? null;
+
+      if (hoveredPinIdRef.current !== hitPlaceId) {
+        hoveredPinIdRef.current = hitPlaceId;
+        container.dataset.hoveredPin = hitPlaceId ?? 'none';
+        if (onHoverMarsPlaceRef.current) {
+          const hoveredMars = hitPlaceId
+            ? MARS_PLACES.find((p) => p.id === hitPlaceId) ?? null
+            : null;
+          onHoverMarsPlaceRef.current(hoveredMars);
+        }
       }
-      renderer.domElement.style.cursor = hits.length > 0 ? 'pointer' : 'grab';
+      renderer.domElement.style.cursor = hitPlaceId ? 'pointer' : 'grab';
     };
 
     const handlePointerLeave = () => {
-      if (hoveredPlanet !== null) {
-        hoveredPlanet = null;
-        container.dataset.hoveredPlanet = 'none';
-      }
+      hoveredPinIdRef.current = null;
+      container.dataset.hoveredPin = 'none';
+      onHoverMarsPlaceRef.current?.(null);
       renderer.domElement.style.cursor = 'grab';
     };
 
@@ -1172,7 +1180,7 @@ export function PlanetaryViewport({
         entry.mat.uniforms.uParallaxRight.value.copy(_camRight);
         entry.mat.uniforms.uParallaxUp.value.copy(_camUp);
 
-        const isHovered = entry.root.visible && hoveredPlanet === entry.id;
+        const isHovered = false;
         const targetHover = isHovered ? 1 : 0;
         entry.mat.uniforms.uHoverAmount.value +=
           (targetHover - entry.mat.uniforms.uHoverAmount.value) * hoverDamp;
@@ -1200,6 +1208,8 @@ export function PlanetaryViewport({
       );
 
       const activePlaceId = selectedPlaceIdRef.current;
+      const hoveredPlaceId = hoveredPinIdRef.current;
+      const pinDamp = 1 - Math.exp(-12 * dt);
       for (const entry of allPinEntries) {
         if (entry.place.planet === 'earth') {
           if (mode === 'earth-moon') {
@@ -1211,9 +1221,25 @@ export function PlanetaryViewport({
           }
         }
         const isActive = entry.place.id === activePlaceId;
-        entry.beaconMat.emissiveIntensity = isActive ? 2.3 : 1.05;
-        entry.group.scale.setScalar(isActive ? 1.44 : 1.0);
-        entry.ringMat.opacity = isActive ? 1.0 : 0.78;
+        const isHovered = entry.place.id === hoveredPlaceId;
+
+        const targetScale = isActive ? 1.44 : isHovered ? 1.28 : 1.0;
+        const targetIntensity = isActive ? 2.6 : isHovered ? 1.95 : 1.05;
+        const targetOpacity = isActive ? 1.0 : isHovered ? 0.98 : 0.78;
+
+        const nextScale = entry.group.scale.x + (targetScale - entry.group.scale.x) * pinDamp;
+        entry.group.scale.setScalar(nextScale);
+        entry.beaconMat.emissiveIntensity +=
+          (targetIntensity - entry.beaconMat.emissiveIntensity) * pinDamp;
+        entry.ringMat.opacity += (targetOpacity - entry.ringMat.opacity) * pinDamp;
+
+        const whiteMix = isActive ? 1.0 : isHovered ? 0.72 : 0.0;
+        entry.beaconMat.emissive.setRGB(
+          entry.baseColor.r + (1 - entry.baseColor.r) * whiteMix,
+          entry.baseColor.g + (1 - entry.baseColor.g) * whiteMix,
+          entry.baseColor.b + (1 - entry.baseColor.b) * whiteMix
+        );
+        entry.ringMat.color.copy(entry.beaconMat.emissive);
       }
 
       // Smooth damped camera focus

@@ -754,9 +754,69 @@ export const MARS_PLACES: PlanetPlace[] = [
     tempMinC: -135,
     tempMaxC: -45,
   },
+  {
+    id: 'mars-place-eberswalde',
+    planet: 'mars',
+    name: 'Eberswalde Crater',
+    region: 'Margaritifer Terra',
+    lat: -23.8,
+    lon: -33.1,
+    coordLabel: '23.80° S, 33.10° W',
+    targetBody: 'Earth Analogue',
+    terrainType: 'Ancient Meandering Delta',
+    planetImage: '/assets/photographs/mars-01-planet-perseverance.png',
+    earthAnalogueName: 'Atacama Alluvial Fans & Terrestrial River Deltas',
+    earthAnalogueDescription: 'Eberswalde Crater preserves one of the finest examples of an ancient meandering river delta on Mars, recording sustained liquid water flow and sedimentary deposition.',
+    scientificFacts: [
+      'Exhibits clear channel loops, distributary lobes, and delta topsets.',
+      'Identified as a runner-up landing site for the Mars 2020 Perseverance rover.',
+      'Indicates persistent aqueous conditions during the Noachian-Hesperian transition.'
+    ],
+    missionInfo: 'Imaged and analyzed by Mars Reconnaissance Orbiter HiRISE and Context Camera.',
+    features: [
+      'Remarkably preserved delta distributary channels',
+      'Fine-grained clay and sulfate sedimentary deposits',
+      'Ancient paleolake basin topography'
+    ],
+    focus: 'An exceptionally preserved ancient river delta recording sustained liquid water transport and sedimentary deposition.',
+    citations: ['nasa', 'frontiersin', 'marsdaily'],
+    linkedCardId: 'mars-atacama',
+    tempMinC: -95,
+    tempMaxC: 14,
+  },
 ];
 
 export const MOON_PLACES: PlanetPlace[] = [
+  {
+    id: 'moon-place-imbrium',
+    planet: 'moon',
+    name: 'Mare Imbrium',
+    region: 'Lunar Nearside Northern Hemisphere',
+    lat: 32.8,
+    lon: -15.6,
+    coordLabel: '32.80° N, 15.60° W',
+    targetBody: 'Earth Analogue',
+    terrainType: 'Basaltic Impact Basin',
+    planetImage: '/assets/photographs/moon-01-planet-apollo15-hadley.jpg',
+    earthAnalogueName: 'Hawaii Basalt Flood Plains & Volcanic Basins',
+    earthAnalogueDescription: 'Mare Imbrium is one of the largest impact craters in the solar system, subsequently flooded by dark, iron-rich basaltic lava flows.',
+    scientificFacts: [
+      'Basin spans over 1,145 km in diameter, formed by a colossal asteroid impact.',
+      'Target site of the Apollo 15 crewed mission at Hadley Rille.',
+      'Surrounded by majestic mountain ranges including the Apennines and Alps.'
+    ],
+    missionInfo: 'Studied by Lunar Orbiter, Apollo 15 landing mission, and LRO.',
+    features: [
+      'Vast smooth dark basaltic plains',
+      'Encircling mountainous ring structures',
+      'Sinuous volcanic rilles like Hadley Rille'
+    ],
+    focus: 'A colossal impact basin flooded with basaltic lavas, serving as a primary lunar mare and sample return target.',
+    citations: ['copernicus', 'wonderdome', 'iasgyan'],
+    linkedCardId: 'moon-volcanic',
+    tempMinC: -173,
+    tempMaxC: 125,
+  },
   {
     id: 'moon-place-tycho',
     planet: 'moon',
